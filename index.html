@@ -2,53 +2,123 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Квиз The Right Crew</title>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Квиз The Right Crew с Firebase</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    .question { margin-bottom: 20px; }
-    .answer-btn { display: block; margin: 5px 0; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    .answer-btn:hover { background: #0056b3; }
-    #stats { margin-top: 40px; }
-    .hidden { display: none; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+      background: #f9f9f9;
+      color: #222;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px #ccc;
+      margin-bottom: 40px;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .question {
+      margin-bottom: 20px;
+    }
+    .question-text {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+    input[type="radio"] {
+      margin-right: 8px;
+    }
+    button {
+      background-color: #4caf50;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .result {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 20px;
+      text-align: center;
+    }
+    #adminPanel {
+      max-width: 700px;
+      margin: auto;
+      background: #eee;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px #aaa;
+      overflow-x: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #ddd;
+    }
   </style>
 </head>
 <body>
+  <div class="container" id="quizContainer">
+    <h1>Квиз The Right Crew</h1>
+    <form id="quizForm">
+      <!-- Вопросы добавятся скриптом -->
+    </form>
+    <button id="submitBtn">Отправить ответы</button>
+    <div id="result" class="result"></div>
+  </div>
 
-<h1>Квиз: The Right Crew</h1>
+  <div class="container" id="adminPanel">
+    <h2>Админка: Статистика ответов в реальном времени</h2>
+    <div id="statsLoading">Загрузка статистики...</div>
+    <div id="statsContainer" style="display:none;">
+      <table id="statsTable">
+        <thead>
+          <tr>
+            <th>Вопрос</th>
+            <th>Вариант</th>
+            <th>Количество ответов</th>
+          </tr>
+        </thead>
+        <tbody id="statsBody">
+        </tbody>
+      </table>
+      <div id="totalResponses" style="margin-top: 15px; font-weight: bold;"></div>
+    </div>
+  </div>
 
-<div id="quiz-container">
-  <!-- Вопросы будут загружены сюда -->
-</div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
-<div id="thankyou" class="hidden">
-  <h2>Спасибо за участие!</h2>
-</div>
-
-<hr/>
-
-<h2>Статистика (админ)</h2>
-<div id="stats"></div>
-
-<script>
-  // Вставь сюда настройки своего Firebase проекта:
-  const firebaseConfig = {
-    apiKey: "AIzaSyCivkeVTtfadjfaUjbZRXkUnDHwD_PzRBc",
-  authDomain: "the-right-crew-quiz.firebaseapp.com",
-  databaseURL: "https://the-right-crew-quiz-default-rtdb.firebaseio.com",
-  projectId: "the-right-crew-quiz",
-  storageBucket: "the-right-crew-quiz.firebasestorage.app",
-  messagingSenderId: "970983835882",
-  appId: "1:970983835882:web:e7784993f9ad00bc016f93"
-  };
-
-  // Инициализация Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-
-  // Вопросы и варианты
-  const questions = [
+  <script>
+    // Вопросы с вариантами и индексом правильного ответа
+    const questions = [
       {
         question: 'В следующий раз, когда задумаюсь, зачем танцую, пересмотрю ваш видос. (с) Саша Козлов. О чём, скорее всего, идёт речь?',
         options: [
@@ -213,71 +283,114 @@
       }
     ];
 
-  const quizContainer = document.getElementById('quiz-container');
-  const thankYouDiv = document.getElementById('thankyou');
-  const statsDiv = document.getElementById('stats');
-
-  let currentQuestionIndex = 0;
-  let userAnswers = {};
-
-  function showQuestion() {
-    if (currentQuestionIndex >= questions.length) {
-      // Отправляем ответы в Firebase
-      const answerId = db.ref('answers').push(userAnswers);
-      quizContainer.classList.add('hidden');
-      thankYouDiv.classList.remove('hidden');
-      return;
-    }
-    const q = questions[currentQuestionIndex];
-    quizContainer.innerHTML = `<div class="question"><h3>${q.text}</h3></div>`;
-    q.answers.forEach(ans => {
-      const btn = document.createElement('button');
-      btn.textContent = ans.text;
-      btn.className = 'answer-btn';
-      btn.onclick = () => {
-        userAnswers[q.id] = ans.id;
-        currentQuestionIndex++;
-        showQuestion();
-      };
-      quizContainer.appendChild(btn);
-    });
-  }
-
-  function showStats(data) {
-    const statsData = data.val();
-    if (!statsData) {
-      statsDiv.innerHTML = '<p>Ответов пока нет.</p>';
-      return;
+    // Функция отрисовки вопросов в форме
+    function renderQuestions() {
+      const form = document.getElementById('quizForm');
+      questions.forEach((q, i) => {
+        const div = document.createElement('div');
+        div.className = 'question';
+        let html = `<div class="question-text">${i + 1}. ${q.question}</div>`;
+        q.options.forEach((option, idx) => {
+          html += `
+            <label>
+              <input type="radio" name="q${i}" value="${idx}" required />
+              ${option}
+            </label>`;
+        });
+        div.innerHTML = html;
+        form.appendChild(div);
+      });
     }
 
-    // Считаем ответы
-    const counts = {};
-    Object.values(statsData).forEach(userAns => {
-      Object.entries(userAns).forEach(([qId, aId]) => {
-        if (!counts[qId]) counts[qId] = {};
-        counts[qId][aId] = (counts[qId][aId] || 0) + 1;
+    renderQuestions();
+
+    // Firebase config - вставь сюда свои данные из Firebase Console!
+    const firebaseConfig = {
+       apiKey: "AIzaSyCivkeVTtfadjfaUjbZRXkUnDHwD_PzRBc",
+  authDomain: "the-right-crew-quiz.firebaseapp.com",
+  databaseURL: "https://the-right-crew-quiz-default-rtdb.firebaseio.com",
+  projectId: "the-right-crew-quiz",
+  storageBucket: "the-right-crew-quiz.firebasestorage.app",
+  messagingSenderId: "970983835882",
+  appId: "1:970983835882:web:e7784993f9ad00bc016f93"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const submitBtn = document.getElementById('submitBtn');
+    const resultDiv = document.getElementById('result');
+
+    submitBtn.addEventListener('click', () => {
+      const form = document.getElementById('quizForm');
+      if (!form.checkValidity()) {
+        alert('Пожалуйста, ответьте на все вопросы');
+        return;
+      }
+
+      // Собираем ответы
+      const formData = new FormData(form);
+      const answers = {};
+      for (let i = 0; i < questions.length; i++) {
+        answers[`q${i}`] = formData.get(`q${i}`);
+      }
+
+      // Считаем количество правильных
+      let correctCount = 0;
+      for (let i = 0; i < questions.length; i++) {
+        if (parseInt(answers[`q${i}`], 10) === questions[i].correctIndex) {
+          correctCount++;
+        }
+      }
+
+      // Отправляем в базу
+      const newResponseKey = db.ref().child('responses').push().key;
+      const updates = {};
+
+      for (let i = 0; i < questions.length; i++) {
+        updates[`stats/q${i}/${answers[`q${i}`]}`] = firebase.database.ServerValue.increment(1);
+      }
+      updates[`responses/${newResponseKey}`] = answers;
+
+      db.ref().update(updates).then(() => {
+        resultDiv.textContent = `Вы ответили правильно на ${correctCount} из ${questions.length} вопросов! Спасибо за участие!`;
+        submitBtn.disabled = true;
+      }).catch((err) => {
+        alert('Ошибка при отправке данных: ' + err.message);
       });
     });
 
-    // Отображаем
-    let html = '';
-    for (const q of questions) {
-      html += `<h4>${q.text}</h4><ul>`;
-      const ansCounts = counts[q.id] || {};
-      q.answers.forEach(ans => {
-        html += `<li>${ans.text}: ${ansCounts[ans.id] || 0}</li>`;
-      });
-      html += '</ul>';
+    // Админка - обновление статистики в реальном времени
+    const statsBody = document.getElementById('statsBody');
+    const statsLoading = document.getElementById('statsLoading');
+    const statsContainer = document.getElementById('statsContainer');
+    const totalResponsesDiv = document.getElementById('totalResponses');
+
+    function renderStats(data) {
+      statsBody.innerHTML = '';
+      let totalAnswersCount = 0;
+      for (let i = 0; i < questions.length; i++) {
+        const qKey = `q${i}`;
+        const questionStats = data[qKey] || {};
+        questions[i].options.forEach((option, idx) => {
+          const count = questionStats[idx] || 0;
+          totalAnswersCount += count;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td style="text-align:left;">${i + 1}. ${questions[i].question}</td>
+                          <td style="text-align:left;">${option}</td>
+                          <td>${count}</td>`;
+          statsBody.appendChild(tr);
+        });
+      }
+      totalResponsesDiv.textContent = `Всего ответов: ${totalAnswersCount}`;
     }
-    statsDiv.innerHTML = html;
-  }
 
-  // Запускаем квиз
-  showQuestion();
-
-  // Слушаем базу для статистики
-  
-</script>
-
+    db.ref('stats').on('value', (snapshot) => {
+      const data = snapshot.val() || {};
+      statsLoading.style.display = 'none';
+      statsContainer.style.display = 'block';
+      renderStats(data);
+    });
+  </script>
 </body>
 </html>
