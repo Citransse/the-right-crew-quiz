@@ -7,70 +7,61 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 10px;
-      background: #f5f5f5;
+      margin: 20px auto;
+      max-width: 700px;
+      background: #f0f0f0;
       color: #222;
-      max-width: 900px;
-      margin-left: auto;
-      margin-right: auto;
     }
     h1 {
       text-align: center;
       margin-bottom: 20px;
     }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      font-size: 14px;
+    .question-block {
       background: white;
-      box-shadow: 0 2px 6px #ccc;
-      border-radius: 6px;
-      overflow: hidden;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
     }
-    th, td {
-      border: 1px solid #999;
-      padding: 10px;
-      text-align: center;
-      vertical-align: middle;
+    .question-text {
+      font-weight: 600;
+      margin-bottom: 15px;
+      font-size: 18px;
     }
-    th {
-      background-color: #ddd;
+    .option {
+      margin: 8px 0;
+      font-size: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    td.question-text, td.option-text {
-      text-align: left;
+    .count {
+      font-weight: 700;
+      color: #444;
+    }
+    canvas {
+      margin-top: 15px;
+      max-width: 100%;
+      height: 250px !important;
     }
     #loading {
-      font-size: 16px;
       text-align: center;
-      margin-top: 40px;
-    }
-    #totalResponses {
-      margin-top: 20px;
-      font-weight: bold;
-      font-size: 16px;
-      text-align: right;
+      font-size: 18px;
+      margin-top: 50px;
+      color: #666;
     }
   </style>
 </head>
 <body>
-  <h1>Статистика ответов на вопросы квиза</h1>
+  <h1>Админка: Статистика ответов</h1>
   <div id="loading">Загрузка данных...</div>
-  <table id="statsTable" style="display:none;">
-    <thead>
-      <tr>
-        <th>№ Вопроса</th>
-        <th>Вопрос</th>
-        <th>Вариант ответа</th>
-        <th>Количество ответов</th>
-      </tr>
-    </thead>
-    <tbody id="statsBody"></tbody>
-  </table>
-  <div id="totalResponses"></div>
+  <div id="content"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
     const questions = [
@@ -94,54 +85,103 @@
       { question: 'Что чаще всего можно увидеть на тренировках The Right Crew?', options: ['Танцы и улыбки', 'Споры о музыке', 'Соревнования по сну на полу'] }
     ];
 
-    // Firebase config - вставь сюда свои данные из Firebase Console
+    // Firebase config — вставь свои данные
     const firebaseConfig = {
-       apiKey: "AIzaSyCivkeVTtfadjfaUjbZRXkUnDHwD_PzRBc",
-  authDomain: "the-right-crew-quiz.firebaseapp.com",
-  databaseURL: "https://the-right-crew-quiz-default-rtdb.firebaseio.com",
-  projectId: "the-right-crew-quiz",
-  storageBucket: "the-right-crew-quiz.firebasestorage.app",
-  messagingSenderId: "970983835882",
-  appId: "1:970983835882:web:e7784993f9ad00bc016f93"
+      apiKey: "ТВОЙ_API_KEY",
+      authDomain: "ТВОЙ_ПРОЕКТ.firebaseapp.com",
+      databaseURL: "https://ТВОЙ_ПРОЕКТ-default-rtdb.firebaseio.com",
+      projectId: "ТВОЙ_ПРОЕКТ",
+      storageBucket: "ТВОЙ_ПРОЕКТ.appspot.com",
+      messagingSenderId: "ТВОЙ_ID",
+      appId: "ТВОЙ_APP_ID"
     };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const statsBody = document.getElementById('statsBody');
+    const contentDiv = document.getElementById('content');
     const loadingDiv = document.getElementById('loading');
-    const statsTable = document.getElementById('statsTable');
-    const totalResponsesDiv = document.getElementById('totalResponses');
+
+    function createQuestionBlock(index, questionData, stats) {
+      const container = document.createElement('div');
+      container.className = 'question-block';
+
+      // Заголовок вопроса
+      const qTitle = document.createElement('div');
+      qTitle.className = 'question-text';
+      qTitle.textContent = `${index + 1}. ${questionData.question}`;
+      container.appendChild(qTitle);
+
+      // Варианты с количеством ответов
+      const counts = [];
+      questionData.options.forEach((option, i) => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'option';
+
+        const optionText = document.createElement('span');
+        optionText.textContent = option;
+
+        const countSpan = document.createElement('span');
+        const count = stats && stats[i] ? stats[i] : 0;
+        countSpan.textContent = count;
+        countSpan.className = 'count';
+
+        optionDiv.appendChild(optionText);
+        optionDiv.appendChild(countSpan);
+
+        container.appendChild(optionDiv);
+        counts.push(count);
+      });
+
+      // Добавляем canvas для диаграммы
+      const canvas = document.createElement('canvas');
+      canvas.id = `chart-${index}`;
+      container.appendChild(canvas);
+
+      // Создаём диаграмму столбцов
+      new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: questionData.options,
+          datasets: [{
+            label: 'Количество ответов',
+            data: counts,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              precision: 0,
+              ticks: { stepSize: 1 }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+
+      return container;
+    }
 
     function renderStats(data) {
-      statsBody.innerHTML = '';
-      let totalAnswersCount = 0;
-
+      contentDiv.innerHTML = '';
       for (let i = 0; i < questions.length; i++) {
         const qKey = `q${i}`;
-        const questionStats = data[qKey] || {};
-        questions[i].options.forEach((option, idx) => {
-          const count = questionStats[idx] || 0;
-          totalAnswersCount += count;
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${i + 1}</td>
-            <td class="question-text">${questions[i].question}</td>
-            <td class="option-text">${option}</td>
-            <td>${count}</td>
-          `;
-          statsBody.appendChild(tr);
-        });
+        const stats = data[qKey] || {};
+        contentDiv.appendChild(createQuestionBlock(i, questions[i], stats));
       }
-
-      totalResponsesDiv.textContent = `Всего ответов: ${totalAnswersCount}`;
     }
 
     db.ref('stats').on('value', (snapshot) => {
       const data = snapshot.val() || {};
       loadingDiv.style.display = 'none';
-      statsTable.style.display = 'table';
       renderStats(data);
     });
   </script>
