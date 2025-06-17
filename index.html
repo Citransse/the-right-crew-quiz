@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Квиз The Right Crew</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    .question { margin-bottom: 20px; }
+    .answer-btn { display: block; margin: 5px 0; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .answer-btn:hover { background: #0056b3; }
+    #stats { margin-top: 40px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>Квиз: The Right Crew</h1>
+
+<div id="quiz-container">
+  <!-- Вопросы будут загружены сюда -->
+</div>
+
+<div id="thankyou" class="hidden">
+  <h2>Спасибо за участие!</h2>
+</div>
+
+<hr/>
+
+<h2>Статистика (админ)</h2>
+<div id="stats"></div>
+
+<script>
+  // Вставь сюда настройки своего Firebase проекта:
+  const firebaseConfig = {
+    apiKey: "AIzaSyCivkeVTtfadjfaUjbZRXkUnDHwD_PzRBc",
+  authDomain: "the-right-crew-quiz.firebaseapp.com",
+  databaseURL: "https://the-right-crew-quiz-default-rtdb.firebaseio.com",
+  projectId: "the-right-crew-quiz",
+  storageBucket: "the-right-crew-quiz.firebasestorage.app",
+  messagingSenderId: "970983835882",
+  appId: "1:970983835882:web:e7784993f9ad00bc016f93"
+  };
+
+  // Инициализация Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // Вопросы и варианты
+  const questions = [
+    {
+      id: 'q1',
+      text: "Кто является основателем и хореографом команды The Right Crew?",
+      answers: [
+        {id: 'a1', text: 'Алексей Иванов'},
+        {id: 'a2', text: 'Саша Козлов'},
+        {id: 'a3', text: 'Дмитрий Смирнов'}
+      ]
+    },
+    {
+      id: 'q2',
+      text: "В каком городе базируется танцевальная команда The Right Crew?",
+      answers: [
+        {id: 'a1', text: 'Москва'},
+        {id: 'a2', text: 'Воронеж'},
+        {id: 'a3', text: 'Санкт-Петербург'}
+      ]
+    },
+    // Добавь остальные вопросы сюда аналогично...
+  ];
+
+  const quizContainer = document.getElementById('quiz-container');
+  const thankYouDiv = document.getElementById('thankyou');
+  const statsDiv = document.getElementById('stats');
+
+  let currentQuestionIndex = 0;
+  let userAnswers = {};
+
+  function showQuestion() {
+    if (currentQuestionIndex >= questions.length) {
+      // Отправляем ответы в Firebase
+      const answerId = db.ref('answers').push(userAnswers);
+      quizContainer.classList.add('hidden');
+      thankYouDiv.classList.remove('hidden');
+      return;
+    }
+    const q = questions[currentQuestionIndex];
+    quizContainer.innerHTML = `<div class="question"><h3>${q.text}</h3></div>`;
+    q.answers.forEach(ans => {
+      const btn = document.createElement('button');
+      btn.textContent = ans.text;
+      btn.className = 'answer-btn';
+      btn.onclick = () => {
+        userAnswers[q.id] = ans.id;
+        currentQuestionIndex++;
+        showQuestion();
+      };
+      quizContainer.appendChild(btn);
+    });
+  }
+
+  function showStats(data) {
+    const statsData = data.val();
+    if (!statsData) {
+      statsDiv.innerHTML = '<p>Ответов пока нет.</p>';
+      return;
+    }
+
+    // Считаем ответы
+    const counts = {};
+    Object.values(statsData).forEach(userAns => {
+      Object.entries(userAns).forEach(([qId, aId]) => {
+        if (!counts[qId]) counts[qId] = {};
+        counts[qId][aId] = (counts[qId][aId] || 0) + 1;
+      });
+    });
+
+    // Отображаем
+    let html = '';
+    for (const q of questions) {
+      html += `<h4>${q.text}</h4><ul>`;
+      const ansCounts = counts[q.id] || {};
+      q.answers.forEach(ans => {
+        html += `<li>${ans.text}: ${ansCounts[ans.id] || 0}</li>`;
+      });
+      html += '</ul>';
+    }
+    statsDiv.innerHTML = html;
+  }
+
+  // Запускаем квиз
+  showQuestion();
+
+  // Слушаем базу для статистики
+  db.ref('answers').on('value', showStats);
+</script>
+
+</body>
+</html>
