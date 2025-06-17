@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Статистика — The Right Crew Quiz</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; background: #f8f8f8; }
+    h1 { color: #333; }
+    .question-block { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    ul { list-style: none; padding-left: 0; }
+    li { margin: 5px 0; }
+  </style>
+</head>
+<body>
+
+<h1>📊 Живая статистика: The Right Crew Quiz</h1>
+<div id="stats">Загрузка...</div>
+
+<script>
+  // 🔐 Вставь сюда тот же конфиг, что и в index.html
+  const firebaseConfig = {
+    apiKey: "ТВОЙ_API_KEY",
+    authDomain: "ТВОЙ_ПРОЕКТ.firebaseapp.com",
+    databaseURL: "https://ТВОЙ_ПРОЕКТ-default-rtdb.firebaseio.com",
+    projectId: "ТВОЙ_ПРОЕКТ",
+    storageBucket: "ТВОЙ_ПРОЕКТ.appspot.com",
+    messagingSenderId: "ТВОЙ_ID",
+    appId: "ТВОЙ_APP_ID"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // Синхронизирован с index.html — обнови вопросы, если добавляешь
+  const questions = [
+    {
+      id: 'q1',
+      text: "Кто является основателем и хореографом команды The Right Crew?",
+      answers: [
+        {id: 'a1', text: 'Алексей Иванов'},
+        {id: 'a2', text: 'Саша Козлов'},
+        {id: 'a3', text: 'Дмитрий Смирнов'}
+      ]
+    },
+    {
+      id: 'q2',
+      text: "В каком городе базируется танцевальная команда The Right Crew?",
+      answers: [
+        {id: 'a1', text: 'Москва'},
+        {id: 'a2', text: 'Воронеж'},
+        {id: 'a3', text: 'Санкт-Петербург'}
+      ]
+    },
+    // Добавь сюда остальные вопросы, если есть
+  ];
+
+  const statsDiv = document.getElementById('stats');
+
+  function showStats(data) {
+    const statsData = data.val();
+    if (!statsData) {
+      statsDiv.innerHTML = '<p>Ответов пока нет.</p>';
+      return;
+    }
+
+    const counts = {};
+    Object.values(statsData).forEach(userAns => {
+      Object.entries(userAns).forEach(([qId, aId]) => {
+        if (!counts[qId]) counts[qId] = {};
+        counts[qId][aId] = (counts[qId][aId] || 0) + 1;
+      });
+    });
+
+    let html = '';
+    for (const q of questions) {
+      html += `<div class="question-block"><h3>${q.text}</h3><ul>`;
+      q.answers.forEach(ans => {
+        const count = counts[q.id]?.[ans.id] || 0;
+        html += `<li>${ans.text}: <strong>${count}</strong></li>`;
+      });
+      html += `</ul></div>`;
+    }
+
+    statsDiv.innerHTML = html;
+  }
+
+  db.ref('answers').on('value', showStats);
+</script>
+
+</body>
+</html>
