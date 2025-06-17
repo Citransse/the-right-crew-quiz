@@ -2,92 +2,148 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Статистика — The Right Crew Quiz</title>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Админка Квиза The Right Crew</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; background: #f8f8f8; }
-    h1 { color: #333; }
-    .question-block { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    ul { list-style: none; padding-left: 0; }
-    li { margin: 5px 0; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 10px;
+      background: #f5f5f5;
+      color: #222;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 14px;
+      background: white;
+      box-shadow: 0 2px 6px #ccc;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 10px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    th {
+      background-color: #ddd;
+    }
+    td.question-text, td.option-text {
+      text-align: left;
+    }
+    #loading {
+      font-size: 16px;
+      text-align: center;
+      margin-top: 40px;
+    }
+    #totalResponses {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 16px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
+  <h1>Статистика ответов на вопросы квиза</h1>
+  <div id="loading">Загрузка данных...</div>
+  <table id="statsTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>№ Вопроса</th>
+        <th>Вопрос</th>
+        <th>Вариант ответа</th>
+        <th>Количество ответов</th>
+      </tr>
+    </thead>
+    <tbody id="statsBody"></tbody>
+  </table>
+  <div id="totalResponses"></div>
 
-<h1>📊 Живая статистика: The Right Crew Quiz</h1>
-<div id="stats">Загрузка...</div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
-<script>
-  // 🔐 Вставь сюда тот же конфиг, что и в index.html
-  const firebaseConfig = {
-    apiKey: "AIzaSyCivkeVTtfadjfaUjbZRXkUnDHwD_PzRBc",
+  <script>
+    const questions = [
+      { question: 'В следующий раз, когда задумаюсь, зачем танцую, пересмотрю ваш видос. (с) Саша Козлов. О чём, скорее всего, идёт речь?', options: ['Про вдохновляющее видео The Right Crew', 'Про архив с тренировками', 'Про видео с падениями'] },
+      { question: 'Мы один набор. Что это значит в контексте команды?', options: ['Все одеты одинаково', 'Все пришли в одно время и сдружились', 'Мы любим китайскую лапшу'] },
+      { question: 'Мы по одному объявлению пришли, а вы по другому. Какой здесь скрытый смысл?', options: ['Мы танцуем лучше', 'Мы с разных «волн», но теперь вместе', 'Кто-то ошибся дверью'] },
+      { question: 'Да все вы у нас отличницы, у кого-то правда синдром (с) Саша Козлов. Что может быть за синдром?', options: ['Танцевальной гиперактивности', 'Превозбуждения на баттле', 'Отличниц с перфекционизмом'] },
+      { question: 'Кстати, давайте соберемся, у меня арбуз есть (с) Аня Верещагина. Что обычно происходит после таких слов?', options: ['Репетиция в полночь', 'Коллективный сон', 'Душевные посиделки и мемы'] },
+      { question: 'Кто из команды чаще всего говорит: «Ну что, потанцуем?»', options: ['Случайный человек на колонке', 'Кто уже переоделся домой', 'Тот, кто уже сделал три соло и просит ещё'] },
+      { question: 'Что точно не является обязательной частью тренировки The Right Crew?', options: ['Упражнение «поймай соседа»', 'Разминка', 'Вода и перерыв на арбуз'] },
+      { question: 'Какие танцевальные стили чаще всего практикует The Right Crew?', options: ['Хип-хоп и брейк-данс', 'Балет и степ', 'Контемпорари и сальса'] },
+      { question: 'Что делают танцоры The Right Crew, если вдруг забыли движения?', options: ['Притворяются, что так и было', 'Импровизируют, как настоящие профи', 'Сразу идут пить чай'] },
+      { question: 'Если бы команда The Right Crew танцевала с домашними животными, кто был бы лучшим танцором?', options: ['Кот — он всегда приземляется на лапы', 'Собака — не пропустит ни одной тренировки', 'Хомяк — всегда крутится в колесе'] },
+      { question: 'Какая из этих фраз больше всего подходит для мотивации танцоров The Right Crew?', options: ['«Танцуй, как будто никто не смотрит»', '«Танцуй, как будто все смотрят»', '«Танцуй, чтобы ноги не болели»'] },
+      { question: 'Какой музыкальный жанр, скорее всего, звучит на тренировках The Right Crew?', options: ['Классическая музыка', 'Хип-хоп и R&B', 'Кантри'] },
+      { question: 'Какую суперспособность хотелось бы иметь танцорам команды?', options: ['Умение танцевать без усталости', 'Телепортация прямо на сцену', 'Возможность менять музыку по настроению'] },
+      { question: 'Если бы The Right Crew снимали фильм, какой жанр был бы у этого фильма?', options: ['Боевик — много динамичных движений', 'Комедия — всегда веселая атмосфера', 'Документальный — правда о тяжелых тренировках'] },
+      { question: 'Какую фразу Саша Козлов, скорее всего, скажет на тренировке?', options: ['«Еще раз! И лучше!»', '«Ну, можно и отдохнуть»', '«Кто хочет — тот танцует»'] },
+      { question: 'Что делают танцоры после многочасовой тренировки?', options: ['Сразу идут домой спать', 'Заказывают пиццу на команду', 'Участвуют в танцевальном баттле с холодильником'] },
+      { question: 'Чем The Right Crew привлекает новых участников?', options: ['Крутыми постановками и дружной атмосферой', 'Бесплатным мороженым после тренировок', 'Бесплатным Wi-Fi в зале'] },
+      { question: 'Что чаще всего можно увидеть на тренировках The Right Crew?', options: ['Танцы и улыбки', 'Споры о музыке', 'Соревнования по сну на полу'] }
+    ];
+
+    // Firebase config - вставь сюда свои данные из Firebase Console
+    const firebaseConfig = {
+       apiKey: "AIzaSyCivkeVTtfadjfaUjbZRXkUnDHwD_PzRBc",
   authDomain: "the-right-crew-quiz.firebaseapp.com",
   databaseURL: "https://the-right-crew-quiz-default-rtdb.firebaseio.com",
   projectId: "the-right-crew-quiz",
   storageBucket: "the-right-crew-quiz.firebasestorage.app",
   messagingSenderId: "970983835882",
   appId: "1:970983835882:web:e7784993f9ad00bc016f93"
-  };
+    };
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  // Синхронизирован с index.html — обнови вопросы, если добавляешь
-  const questions = [
-    {
-      id: 'q1',
-      text: "Кто является основателем и хореографом команды The Right Crew?",
-      answers: [
-        {id: 'a1', text: 'Алексей Иванов'},
-        {id: 'a2', text: 'Саша Козлов'},
-        {id: 'a3', text: 'Дмитрий Смирнов'}
-      ]
-    },
-    {
-      id: 'q2',
-      text: "В каком городе базируется танцевальная команда The Right Crew?",
-      answers: [
-        {id: 'a1', text: 'Москва'},
-        {id: 'a2', text: 'Воронеж'},
-        {id: 'a3', text: 'Санкт-Петербург'}
-      ]
-    },
-    // Добавь сюда остальные вопросы, если есть
-  ];
+    const statsBody = document.getElementById('statsBody');
+    const loadingDiv = document.getElementById('loading');
+    const statsTable = document.getElementById('statsTable');
+    const totalResponsesDiv = document.getElementById('totalResponses');
 
-  const statsDiv = document.getElementById('stats');
+    function renderStats(data) {
+      statsBody.innerHTML = '';
+      let totalAnswersCount = 0;
 
-  function showStats(data) {
-    const statsData = data.val();
-    if (!statsData) {
-      statsDiv.innerHTML = '<p>Ответов пока нет.</p>';
-      return;
+      for (let i = 0; i < questions.length; i++) {
+        const qKey = `q${i}`;
+        const questionStats = data[qKey] || {};
+        questions[i].options.forEach((option, idx) => {
+          const count = questionStats[idx] || 0;
+          totalAnswersCount += count;
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td class="question-text">${questions[i].question}</td>
+            <td class="option-text">${option}</td>
+            <td>${count}</td>
+          `;
+          statsBody.appendChild(tr);
+        });
+      }
+
+      totalResponsesDiv.textContent = `Всего ответов: ${totalAnswersCount}`;
     }
 
-    const counts = {};
-    Object.values(statsData).forEach(userAns => {
-      Object.entries(userAns).forEach(([qId, aId]) => {
-        if (!counts[qId]) counts[qId] = {};
-        counts[qId][aId] = (counts[qId][aId] || 0) + 1;
-      });
+    db.ref('stats').on('value', (snapshot) => {
+      const data = snapshot.val() || {};
+      loadingDiv.style.display = 'none';
+      statsTable.style.display = 'table';
+      renderStats(data);
     });
-
-    let html = '';
-    for (const q of questions) {
-      html += `<div class="question-block"><h3>${q.text}</h3><ul>`;
-      q.answers.forEach(ans => {
-        const count = counts[q.id]?.[ans.id] || 0;
-        html += `<li>${ans.text}: <strong>${count}</strong></li>`;
-      });
-      html += `</ul></div>`;
-    }
-
-    statsDiv.innerHTML = html;
-  }
-
-  db.ref('answers').on('value', showStats);
-</script>
-
+  </script>
 </body>
 </html>
